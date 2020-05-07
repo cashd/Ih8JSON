@@ -1,0 +1,26 @@
+{
+  "name": "ih8json",
+  "version": "1.0.0",
+  "description": "Easy Web Framework with native JSON support.",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "npm run build && node build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cashd/Ih8JSON.git"
+  },
+  "author": "Cash DeLeon",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cashd/Ih8JSON/issues"
+  },
+  "homepage": "https://github.com/cashd/Ih8JSON#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^13.13.5",
+    "typescript": "^3.8.3"
+  }
+}
