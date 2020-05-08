@@ -18,7 +18,10 @@
     "url": "https://github.com/cashd/Ih8JSON/issues"
   },
   "homepage": "https://github.com/cashd/Ih8JSON#readme",
-  "dependencies": {},
+  "dependencies": {
+    "@types/treeify": "^1.0.0",
+    "treeify": "^1.1.0"
+  },
   "devDependencies": {
     "@types/node": "^13.13.5",
     "typescript": "^3.8.3"
