@@ -1,14 +1,33 @@
-import { createServer, RequestListener, ServerResponse } from "http";
+import {
+  createServer,
+  RequestListener,
+  ServerResponse,
+  IncomingMessage,
+} from "http";
 import treeify, { TreeObject } from "treeify";
 
-interface Response {}
+class Response {
+  payload: object;
+  params: object;
+  constructor() {
+    this.payload = {};
+    this.params = {};
+  }
+}
 
-interface Request {}
+class Request {
+  constructor() {}
+}
 
 interface MountInstructions {
   startIndex: number;
   node: Route;
   sameEnd: boolean;
+}
+
+interface InheritancePayload {
+  middleware?: Array<Middleware>;
+  desiredEndware?: Array<EndWare>;
 }
 
 type EventHandler = (req: Request, res: Response) => Response | void;
@@ -21,6 +40,8 @@ type EventHandlerType =
   | "patch"
   | "options";
 type HTTPMethod = EventHandlerType;
+type Middleware = EventHandler;
+type EndWare = () => void;
 
 function routeMaker(
   path: Array<string>,
@@ -29,19 +50,33 @@ function routeMaker(
   handler?: EventHandler
 ): Route {
   const length = path.length;
-  var base = new Route(path[0], routerRef);
-  var parent = base;
-  path.slice(1).forEach((elem, i) => {
-    var newRoute = new Route(elem, routerRef);
+  var base: Route | null = null;
+  var parent: Route | null = null;
+  path.forEach((elem, i) => {
+    // Do a regex check here instead later for dyanmic path
+    if (elem.includes("<") && elem.includes(">")) {
+      var newRoute = new Route(elem, routerRef, true);
+      parent && parent.setDynamicChild(newRoute);
+    } else {
+      var newRoute = new Route(elem, routerRef);
+    }
     if (i === length - 1 && handler) {
       eventHandlerType &&
         handler &&
         newRoute.setHTTPMethodEventHandler(eventHandlerType, handler);
     }
-    parent.children[elem] = newRoute;
+    if (!base) {
+      base = newRoute;
+    }
+    if (parent) {
+      parent.children[elem] = newRoute;
+    }
     parent = newRoute;
   });
-  return base;
+  if (!!base) {
+    return base;
+  }
+  throw new Error("Cannot make route for an empty path!");
 }
 
 function createPathChain(path: string): Array<string> {
@@ -71,6 +106,9 @@ class Route {
   children: Record<string, Route>;
   value: string;
   routerRef: Router;
+  isDynamic: boolean;
+  dynamicChild?: Route;
+  middleware: Array<Middleware>;
   private getHandler?: EventHandler;
   private postHandler?: EventHandler;
   private putHandler?: EventHandler;
@@ -78,18 +116,20 @@ class Route {
   private deleteHandler?: EventHandler;
   private patchHandler?: EventHandler;
   private optionsHandler?: EventHandler;
-  constructor(path: string, routerRef: Router) {
+  constructor(path: string, routerRef: Router, isDynamic?: boolean) {
     this.children = {};
     this.value = path;
     this.routerRef = routerRef;
+    this.isDynamic = isDynamic || false;
+    this.middleware = [];
   }
 
   get(path: string, handler: EventHandler) {
-    this.routerRef.mount(path, this);
+    this.routerRef.mount(path, this, "get", handler);
   }
 
   post(path: string, handler: EventHandler) {
-    this.routerRef.mount(path, this);
+    this.routerRef.mount(path, this, "post", handler);
   }
 
   put(path: string, handler: EventHandler) {
@@ -112,7 +152,17 @@ class Route {
     this.routerRef.mount(path, this);
   }
 
-  setHTTPMethodEventHandler(method: HTTPMethod, func: EventHandler) {
+  setDynamicChild(child: Route): void {
+    if (!!this.dynamicChild) {
+      console.log(
+        "Warning: Duplicate Dynamic Routes in the same position. Ignoring recent."
+      );
+      return;
+    }
+    this.dynamicChild = child;
+  }
+
+  setHTTPMethodEventHandler(method: HTTPMethod, func: EventHandler): void {
     switch (method) {
       case "get":
         this.getHandler = func;
@@ -193,21 +243,68 @@ class Router {
     child && this.addNewRouteToSet(child);
   }
 
-  mount(path: string, mountTo?: Route): Route {
+  // Agregates all variables that are suppose to be past down
+  // * middleware
+  // need to test if copy is needed
+  // syncAllNewChildren(start: Route, parent: Route) {
+  //   let middleware = parent.middleware.slice(0); // Copy
+  //   const helper = (current: Route, par: Route) => {
+  //     middleware = [...middleware, ...current.middleware];
+  //     current.middleware = middleware.slice(0); // Copy
+  //   };
+  //   helper(start, parent);
+  // }
+
+  mount(
+    path: string,
+    mountTo?: Route,
+    handlerType?: EventHandlerType,
+    handler?: EventHandler
+  ): Route {
     const pathChain = createPathChain(path);
-    const instr = this.findMountableNode(pathChain);
+    const instr = this.findMountableNode(pathChain, mountTo);
     if (instr.sameEnd) {
       throw Error("Cannot mount duplicate url path!");
     }
-    var route = routeMaker(pathChain.slice(instr.startIndex), this);
+    const newPathChain = pathChain.slice(instr.startIndex);
+    var route = routeMaker(newPathChain, this, handlerType, handler);
     this.addNewRouteToSet(route);
-    if (mountTo) {
-      mountTo.children[pathChain.slice(instr.startIndex)[0]] = route;
-    } else {
-      instr.node.children[pathChain.slice(instr.startIndex)[0]] = route;
-    }
+    const base: Route = mountTo || instr.node;
+    base.children[newPathChain[0]] = route;
+    // Check if first new child is a dynamic
+    route.isDynamic && base.setDynamicChild(route);
+    // this.syncAllNewChildren(base, base.children[newPathChain[0]]);
     return route;
   }
+
+  routeRequest(path: string, request: Request): Response {
+    // make sure Request is a pointer to object
+    const pathSteps = createPathChain(path);
+    // Activate all mw function and carry reponse payload
+    const response = new Response();
+    let currentRoute = this.baseRoute;
+    pathSteps.forEach((step) => {
+      // Run all middleware
+      currentRoute.middleware.forEach((mw) => {
+        mw(request, response);
+      });
+      if (!(step in currentRoute.children)) {
+        if (!!currentRoute.dynamicChild) {
+          currentRoute = currentRoute.dynamicChild;
+        } else {
+          console.error("invalid http path request header", request);
+          // return redirect response later to 404 not found
+        }
+      } else {
+        currentRoute = currentRoute.children[step];
+      }
+    });
+    // TODO Reached specific route object activate right handlers
+    return response;
+  }
+
+  // Router Tree Navigation
+  route(start: Route) {}
 
   getRoute(url: string) {}
 
@@ -222,4 +319,7 @@ var serv = new Server("/");
 var userRoutes = serv.mount("/users/");
 var newRoute = serv.mount("/users/new/");
 userRoutes.get("/settings/", () => console.log("In the settings route!"));
+userRoutes.get("/<profile>/view", () => console.log("in route w dynamic name"));
+serv.printRoutes();
+serv.router.routeRequest("/users/cashd/view", new Request());
 serv.printRoutes();
