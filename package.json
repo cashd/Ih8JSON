@@ -20,7 +20,9 @@
   "homepage": "https://github.com/cashd/Ih8JSON#readme",
   "dependencies": {
     "@types/treeify": "^1.0.0",
-    "treeify": "^1.1.0"
+    "@types/validator": "^13.0.0",
+    "treeify": "^1.1.0",
+    "validator": "^13.0.0"
   },
   "devDependencies": {
     "@types/node": "^13.13.5",

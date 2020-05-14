@@ -11,7 +11,6 @@ export function routeMaker(
   var base: Route | null = null;
   var parent: Route | null = null;
   path.forEach((elem, i) => {
-    // Do a regex check here instead later for dyanmic path
     if (elem.includes("<") && elem.includes(">")) {
       var newRoute = new Route(elem, routerRef, true);
       parent && parent.setDynamicChild(newRoute);
@@ -53,11 +52,7 @@ export function createPathChain(path: string): Array<string> {
     actualPath = actualPath.slice(0, -1);
   }
 
-  if (!actualPath) {
-    throw new Error("");
-  }
-
-  return actualPath.split("/");
+  return !actualPath ? [] : actualPath.split("/");
 }
 
 export default { routeMaker, createPathChain };

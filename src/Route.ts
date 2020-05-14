@@ -1,18 +1,33 @@
-import Request from "./Request";
-import Response from "./Response";
 import Router from "./Router";
 
-export type EventHandler = (req: Request, res: Response) => Response | void;
+import type { IncomingMessage, ServerResponse } from "http";
+
+export type EventHandler = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  store?: object
+) => DocumentResponse;
+
 export type EventHandlerType =
-  | "get"
-  | "post"
-  | "put"
-  | "head"
-  | "delete"
-  | "patch"
-  | "options";
+  | "GET"
+  | "POST"
+  | "PUT"
+  | "HEAD"
+  | "DELETE"
+  | "PATCH"
+  | "OPTIONS";
+
 export type HTTPMethod = EventHandlerType;
-export type Middleware = EventHandler;
+
+type HttpHandlers = Record<HTTPMethod, EventHandler>;
+
+type DocumentResponse = object;
+
+type Middleware = (
+  req?: IncomingMessage,
+  res?: ServerResponse,
+  store?: object
+) => void;
 
 export class Route {
   children: Record<string, Route>;
@@ -21,47 +36,65 @@ export class Route {
   isDynamic: boolean;
   dynamicChild?: Route;
   middleware: Array<Middleware>;
-  private getHandler?: EventHandler;
-  private postHandler?: EventHandler;
-  private putHandler?: EventHandler;
-  private headHandler?: EventHandler;
-  private deleteHandler?: EventHandler;
-  private patchHandler?: EventHandler;
-  private optionsHandler?: EventHandler;
+  httpHandlers: HttpHandlers;
+  public getHandler?: EventHandler;
+  public postHandler?: EventHandler;
+  public putHandler?: EventHandler;
+  public headHandler?: EventHandler;
+  public deleteHandler?: EventHandler;
+  public patchHandler?: EventHandler;
+  public optionsHandler?: EventHandler;
   constructor(path: string, routerRef: Router, isDynamic?: boolean) {
     this.children = {};
     this.value = path;
     this.routerRef = routerRef;
     this.isDynamic = isDynamic || false;
     this.middleware = [];
+    this.httpHandlers = {
+      GET: () => ({}),
+      POST: () => ({}),
+      PUT: () => ({}),
+      HEAD: () => ({}),
+      DELETE: () => ({}),
+      PATCH: () => ({}),
+      OPTIONS: () => ({}),
+    };
   }
 
   get(path: string, handler: EventHandler) {
-    this.routerRef.mount(path, this, "get", handler);
+    this.routerRef.mount(path, this, "GET", handler);
   }
 
   post(path: string, handler: EventHandler) {
-    this.routerRef.mount(path, this, "post", handler);
+    this.routerRef.mount(path, this, "POST", handler);
   }
 
   put(path: string, handler: EventHandler) {
-    this.routerRef.mount(path, this);
+    this.routerRef.mount(path, this, "PUT", handler);
   }
 
   head(path: string, handler: EventHandler) {
-    this.routerRef.mount(path, this);
+    this.routerRef.mount(path, this, "HEAD", handler);
   }
 
   delete(path: string, handler: EventHandler) {
-    this.routerRef.mount(path, this);
+    this.routerRef.mount(path, this, "DELETE", handler);
   }
 
   patch(path: string, handler: EventHandler) {
-    this.routerRef.mount(path, this);
+    this.routerRef.mount(path, this, "PATCH", handler);
   }
 
   options(path: string, handler: EventHandler) {
-    this.routerRef.mount(path, this);
+    this.routerRef.mount(path, this, "OPTIONS", handler);
+  }
+
+  addMiddleware(mw: Middleware | Array<Middleware>) {
+    if (Array.isArray(mw)) {
+      this.middleware = this.middleware.concat(mw);
+    } else {
+      this.middleware.push(mw);
+    }
   }
 
   setDynamicChild(child: Route): void {
@@ -75,29 +108,7 @@ export class Route {
   }
 
   setHTTPMethodEventHandler(method: HTTPMethod, func: EventHandler): void {
-    switch (method) {
-      case "get":
-        this.getHandler = func;
-        break;
-      case "post":
-        this.postHandler = func;
-        break;
-      case "put":
-        this.putHandler = func;
-        break;
-      case "head":
-        this.headHandler = func;
-        break;
-      case "delete":
-        this.deleteHandler = func;
-        break;
-      case "patch":
-        this.patchHandler = func;
-        break;
-      case "options":
-        this.optionsHandler = func;
-        break;
-    }
+    this.httpHandlers[method] = func;
   }
 }
 

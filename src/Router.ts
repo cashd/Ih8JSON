@@ -1,9 +1,7 @@
-import Request from "./Request";
-import Response from "./Response";
-
 import Route, { EventHandler, EventHandlerType } from "./Route";
 import treeify, { TreeObject } from "treeify";
 import { createPathChain, routeMaker } from "./utils";
+import { IncomingMessage, ServerResponse } from "http";
 
 interface MountInstructions {
   startIndex: number;
@@ -11,13 +9,12 @@ interface MountInstructions {
   sameEnd: boolean;
 }
 
-interface InheritancePayload {
-  middleware?: Array<Middleware>;
-  desiredEndware?: Array<EndWare>;
+export interface RequestPayload {
+  request: IncomingMessage;
+  response: ServerResponse;
+  params: Record<string, any>;
+  store: Record<string, any>;
 }
-
-type Middleware = EventHandler;
-type EndWare = () => void;
 
 class Router {
   routes: Set<Route>;
@@ -58,18 +55,6 @@ class Router {
     child && this.addNewRouteToSet(child);
   }
 
-  // Agregates all variables that are suppose to be past down
-  // * middleware
-  // need to test if copy is needed
-  // syncAllNewChildren(start: Route, parent: Route) {
-  //   let middleware = parent.middleware.slice(0); // Copy
-  //   const helper = (current: Route, par: Route) => {
-  //     middleware = [...middleware, ...current.middleware];
-  //     current.middleware = middleware.slice(0); // Copy
-  //   };
-  //   helper(start, parent);
-  // }
-
   mount(
     path: string,
     mountTo?: Route,
@@ -86,42 +71,31 @@ class Router {
     this.addNewRouteToSet(route);
     const base: Route = mountTo || instr.node;
     base.children[newPathChain[0]] = route;
-    // Check if first new child is a dynamic
     route.isDynamic && base.setDynamicChild(route);
-    // this.syncAllNewChildren(base, base.children[newPathChain[0]]);
     return route;
   }
 
-  routeRequest(path: string, request: Request): Response {
-    // make sure Request is a pointer to object
+  // Starts the routing process and returns the final route
+  start(path: string, payload: RequestPayload): Route {
     const pathSteps = createPathChain(path);
-    // Activate all mw function and carry reponse payload
-    const response = new Response();
+    const { store, request, response } = payload;
     let currentRoute = this.baseRoute;
     pathSteps.forEach((step) => {
-      // Run all middleware
       currentRoute.middleware.forEach((mw) => {
-        mw(request, response);
+        mw(request, response, store);
       });
       if (!(step in currentRoute.children)) {
         if (!!currentRoute.dynamicChild) {
           currentRoute = currentRoute.dynamicChild;
         } else {
           console.error("invalid http path request header", request);
-          // return redirect response later to 404 not found
         }
       } else {
         currentRoute = currentRoute.children[step];
       }
     });
-    // TODO Reached specific route object activate right handlers
-    return response;
+    return currentRoute;
   }
-
-  // Router Tree Navigation
-  route(start: Route) {}
-
-  getRoute(url: string) {}
 
   print() {
     console.log(
