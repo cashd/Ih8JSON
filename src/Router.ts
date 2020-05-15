@@ -3,7 +3,7 @@ import treeify, { TreeObject } from "treeify";
 import { createPathChain, routeMaker } from "./utils";
 import { IncomingMessage, ServerResponse } from "http";
 
-interface MountInstructions {
+export interface MountInstructions {
   startIndex: number;
   node: Route;
   sameEnd: boolean;
@@ -18,7 +18,7 @@ export interface RequestPayload {
 
 
 
-class Router {
+export class Router {
   routes: Set<Route>;
   baseRoute: Route;
   constructor(basePath: string = "/") {

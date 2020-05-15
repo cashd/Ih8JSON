@@ -1,8 +1,9 @@
 {
   "name": "ih8json",
-  "version": "1.0.0",
-  "description": "Easy Web Framework with native JSON support.",
+  "version": "0.0.1",
+  "description": "Easy and safe webframwork for fast develeopment and treats data natively.",
   "main": "index.js",
+  "types": "index.d.ts",
   "scripts": {
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1",

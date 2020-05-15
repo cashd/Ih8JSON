@@ -1,7 +1,6 @@
 import Router from "./Router";
 
 import type {
-  IncomingMessage,
   ServerResponse,
   IncomingHttpHeaders,
 } from "http";
@@ -31,11 +30,11 @@ export type EventHandlerType =
 
 export type HTTPMethod = EventHandlerType;
 
-type HttpHandlers = Record<HTTPMethod, EventHandler>;
+export type HttpHandlers = Record<HTTPMethod, EventHandler>;
 
-type DocumentResponse = object;
+export type DocumentResponse = object;
 
-type Middleware = (req?: Request, res?: ServerResponse, store?: object) => void;
+export type Middleware = (req: Request, res: ServerResponse, store?: object) => void;
 
 export class Route {
   children: Record<string, Route>;
