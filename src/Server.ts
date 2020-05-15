@@ -8,6 +8,7 @@ import {
   ServerResponse,
   IncomingMessage,
   Server as HttpServer,
+  IncomingHttpHeaders,
 } from "http";
 import isUrl from "validator/lib/isUrl";
 
@@ -28,41 +29,42 @@ export class Server {
   constructor(path: string = "/") {
     this.router = new Router(path);
     this.route = this.router.baseRoute;
-    this.requestHandler = (
-      request: IncomingMessage,
-      response: ServerResponse
-    ) => {
-      const url = request.url;
-      const httpMethod = request.method;
+    this.requestHandler = this.requestHandler.bind(this);
+    // this.requestHandler = (
+    //   request: IncomingMessage,
+    //   response: ServerResponse
+    // ) => {
+    //   const url = request.url;
+    //   const httpMethod = request.method;
 
-      // To appease typescript
-      if (!!url && !!httpMethod) {
-        const payload: RequestPayload = {
-          store: {},
-          params: {},
-          request,
-          response,
-        };
-        const finalRoute = this.router.start(url, payload);
-        if (finalRoute.httpHandlers[httpMethod as HTTPMethod]) {
-          const output = finalRoute.httpHandlers[httpMethod as HTTPMethod](
-            payload.request,
-            payload.response,
-            payload.store
-          );
-          // Assuming json output for now
-          // TODO: Add multiple return content types
-          response.writeHead(200, "Content-Type: application/json");
-          // TODO: Check if stringify needs to be recursive
-          response.write(JSON.stringify(output));
-        } else {
-          // TODO: Throw NoResourceFoundError
-          response.writeHead(404);
-          response.write(404);
-        }
-      }
-      response.end();
-    };
+    //   // To appease typescript
+    //   if (!!url && !!httpMethod) {
+    //     const payload: RequestPayload = {
+    //       store: {},
+    //       params: {},
+    //       request,
+    //       response,
+    //     };
+    //     const finalRoute = this.router.start(url, payload);
+    //     if (finalRoute.httpHandlers[httpMethod as HTTPMethod]) {
+    //       const output = finalRoute.httpHandlers[httpMethod as HTTPMethod](
+    //         payload.request,
+    //         payload.response,
+    //         payload.store
+    //       );
+    //       // Assuming json output for now
+    //       // TODO: Add multiple return content types
+    //       response.writeHead(200, "Content-Type: application/json");
+    //       // TODO: Check if stringify needs to be recursive
+    //       response.write(JSON.stringify(output));
+    //     } else {
+    //       // TODO: Throw NoResourceFoundError
+    //       response.writeHead(404);
+    //       response.write(404);
+    //     }
+    //   }
+    //   response.end();
+    // };
     this.server = createServer((req, res) => this.requestHandler(req, res));
   }
 
@@ -84,36 +86,75 @@ export class Server {
   //   );
   // }
 
+  decodeBody(contentType: string, body: string) {
+    // if (contentType === 'application/json')
+    return JSON.parse(body);
+  }
+
   requestHandler(request: IncomingMessage, response: ServerResponse) {
     const url = request.url;
     const httpMethod = request.method;
 
     // To appease typescript
     if (!!url && !!httpMethod) {
-      const payload: RequestPayload = {
-        store: {},
-        params: {},
-        request,
-        response,
-      };
-      const finalRoute = this.router.start(url, payload);
-      if (finalRoute.httpHandlers[httpMethod as HTTPMethod]) {
-        const output = finalRoute.httpHandlers[httpMethod as HTTPMethod](
-          payload.request,
-          payload.response,
-          payload.store
-        );
-        // Assuming json output for now
-        // TODO: Add multiple return content types
-        response.writeHead(200, "Content-Type: application/json");
-        // TODO: Check if stringify needs to be recursive
-        response.write(JSON.stringify(output));
-      } else {
-        // TODO: Throw NoResourceFoundError
-        response.writeHead(404);
-      }
+      const buffer: Array<any> = [];
+      request
+        .on("data", (chunk) => {
+          buffer.push(chunk);
+        })
+        .on("end", () => {
+          // default to text eventually or blob
+          const body = this.decodeBody(
+            request.headers["content-type"] || "application/json",
+            Buffer.concat(buffer).toString()
+          );
+          const payload: RequestPayload = {
+            store: { params: {} },
+            request: {
+              body,
+              url,
+              params: {},
+              headers: request.headers,
+              method: httpMethod as HTTPMethod,
+            },
+            response,
+          };
+          const finalRoute = this.router.start(url, payload);
+          if (finalRoute.httpHandlers[httpMethod as HTTPMethod]) {
+            const output = finalRoute.httpHandlers[httpMethod as HTTPMethod](
+              payload.request,
+              payload.response,
+              payload.store
+            );
+            // Assuming json output for now
+            // TODO: Add multiple return content types
+            response.writeHead(200, "Content-Type: application/json");
+            // TODO: Check if stringify needs to be recursive
+            response.write(JSON.stringify(output));
+          } else {
+            // TODO: Throw NoResourceFoundError
+            response.writeHead(404);
+          }
+          response.end();
+        });
+      // const finalRoute = this.router.start(url, payload);
+      // if (finalRoute.httpHandlers[httpMethod as HTTPMethod]) {
+      //   const output = finalRoute.httpHandlers[httpMethod as HTTPMethod](
+      //     payload.request,
+      //     payload.response,
+      //     payload.store
+      //   );
+      //   // Assuming json output for now
+      //   // TODO: Add multiple return content types
+      //   response.writeHead(200, "Content-Type: application/json");
+      //   // TODO: Check if stringify needs to be recursive
+      //   response.write(JSON.stringify(output));
+      // } else {
+      //   // TODO: Throw NoResourceFoundError
+      //   response.writeHead(404);
+      // }
     }
-    response.end();
+    // response.end();
   }
 
   run(port?: number, hostname?: string) {

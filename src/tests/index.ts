@@ -7,7 +7,7 @@ serv.route.addMiddleware((req, res) =>
 const test = serv.mount("/test");
 test.addMiddleware((req, res) => {});
 test.get("/1", (req, res) => {
-  console.log("here in the callback test/1");
+  console.log(req);
   return { cash: "deleon" };
 });
 serv.run();

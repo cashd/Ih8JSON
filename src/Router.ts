@@ -1,4 +1,4 @@
-import Route, { EventHandler, EventHandlerType } from "./Route";
+import Route, { EventHandler, EventHandlerType, Request } from "./Route";
 import treeify, { TreeObject } from "treeify";
 import { createPathChain, routeMaker } from "./utils";
 import { IncomingMessage, ServerResponse } from "http";
@@ -10,11 +10,13 @@ interface MountInstructions {
 }
 
 export interface RequestPayload {
-  request: IncomingMessage;
+  request: Request;
   response: ServerResponse;
-  params: Record<string, any>;
+  // params: Record<string, any>;
   store: Record<string, any>;
 }
+
+
 
 class Router {
   routes: Set<Route>;
