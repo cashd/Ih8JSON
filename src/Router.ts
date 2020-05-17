@@ -1,7 +1,7 @@
 import Route, { EventHandler, EventHandlerType, Request } from "./Route";
 import treeify, { TreeObject } from "treeify";
 import { createPathChain, routeMaker } from "./utils";
-import { IncomingMessage, ServerResponse } from "http";
+import Response from "./Response";
 
 export interface MountInstructions {
   startIndex: number;
@@ -11,12 +11,9 @@ export interface MountInstructions {
 
 export interface RequestPayload {
   request: Request;
-  response: ServerResponse;
-  // params: Record<string, any>;
+  response: Response;
   store: Record<string, any>;
 }
-
-
 
 export class Router {
   routes: Set<Route>;

@@ -1,34 +1,36 @@
-import Router from "./Router";
-import Route, { HTTPMethod } from "./Route";
-
-import type { RequestPayload } from "./Router";
-
 import {
   createServer,
   ServerResponse,
   IncomingMessage,
   Server as HttpServer,
 } from "http";
-import isUrl from "validator/lib/isUrl";
 
-// const HTTP_METHODS = new Set([
-//   "GET",
-//   "POST",
-//   "PUT",
-//   "DELETE",
-//   "OPTIONS",
-//   "HEAD",
-// ]);
+import Response from "./Response";
+import Router from "./Router";
+import Route, { HTTPMethod } from "./Route";
+import type { RequestPayload } from "./Router";
 
 export class Server {
   public router: Router;
   public route: Route;
+
   private server: HttpServer;
+  private postProcessorCallbacks: Record<string, Function>;
+
   constructor(path: string = "/") {
     this.router = new Router(path);
     this.route = this.router.baseRoute;
     this.requestHandler = this.requestHandler.bind(this);
     this.server = createServer((req, res) => this.requestHandler(req, res));
+    this.postProcessorCallbacks = {
+      "application/json": (body: any) => {
+        return JSON.stringify(body);
+      },
+    };
+  }
+
+  addPostProcessor(contentType: string, func: Function) {
+    this.postProcessorCallbacks[contentType] = func;
   }
 
   mount(path: string, middleware?: Array<Function>): Route {
@@ -78,7 +80,7 @@ export class Server {
               headers: request.headers,
               method: httpMethod as HTTPMethod,
             },
-            response,
+            response: new Response(response),
           };
           const finalRoute = this.router.start(url, payload);
           if (finalRoute.httpHandlers[httpMethod as HTTPMethod]) {
@@ -87,13 +89,22 @@ export class Server {
               payload.response,
               payload.store
             );
-            // Assuming json output for now
-            // TODO: Add multiple return content types
-            response.writeHead(200, "Content-Type: application/json");
-            // TODO: Check if stringify needs to be recursive
-            response.write(JSON.stringify(output));
+
+            const contentType =
+              payload.response.desiredContentType || "application/json";
+            if (payload.response.postProcessorCallback) {
+              response.write(payload.response.postProcessorCallback(output));
+            } else {
+              if (contentType && this.postProcessorCallbacks[contentType]) {
+                response.write(
+                  this.postProcessorCallbacks[contentType](output)
+                );
+              } else {
+                // Figure out what to default output to
+                console.error("Did not specify valid content-type header!");
+              }
+            }
           } else {
-            // TODO: Throw NoResourceFoundError
             response.writeHead(404);
           }
           response.end();

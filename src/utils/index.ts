@@ -1,4 +1,4 @@
-import { EventHandler, EventHandlerType, Route } from "../Route";
+import Route, { EventHandler, EventHandlerType } from "../Route";
 import Router from "../Router";
 
 export function routeMaker(
